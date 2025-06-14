@@ -6,10 +6,14 @@ const path = require('path');
 
 console.log('[INFO] Iniciando servidor...');
 
-// Importar rutas
+// Rutas importadas
 console.log('[INFO] Importando rutas...');
 const preguntasRouter = require('./routes/preguntas');
-const buscarRoute = require('./routes/buscar');
+const buscarRouter = require('./routes/buscar');
+const eventosRouter = require('./routes/eventos');
+const personajesRouter = require('./routes/personajes');
+const lugaresRouter = require('./routes/lugares');
+const generacionesRouter = require('./routes/generaciones');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -34,22 +38,24 @@ mongoose.connect(
 // Rutas de API
 console.log('[INFO] Cargando rutas de API...');
 
-
 app.use('/api/preguntas', (req, res, next) => {
     console.log(`[ROUTE] /api/preguntas - Método: ${req.method}`);
     next();
 }, preguntasRouter);
 
-
-app.use('/api/buscar', buscarRoute);
+app.use('/api/buscar', buscarRouter);
+app.use('/api/eventos', eventosRouter);
+app.use('/api/personajes', personajesRouter);
+app.use('/api/lugares', lugaresRouter);
+app.use('/api/generaciones', generacionesRouter);
 
 // Servir archivos estáticos
 console.log('[INFO] Configurando archivos estáticos desde /public...');
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Ruta específica (opcional)
+// Ruta específica para frontend
 app.get('/main', (req, res) => {
-    console.log('[ROUTE] /main - Enviando Cien_anos.html');
+    console.log('[ROUTE] /main - Enviando Main.html');
     res.sendFile(path.join(__dirname, 'public', 'Main.html'));
 });
 

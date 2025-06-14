@@ -34,17 +34,21 @@ const verbosClave = {
   imponer: ["imponer", "impuso", "estableció", "dominó", "puso orden", "establecer orden", "trajo disciplina", "impuesto"]
 };
 
+function escapeRegex(text) {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 function matchFlexible(entidadNormal, textoNormal) {
   if (!entidadNormal || !textoNormal) return false;
 
-  // Comparación simple
+  // Coincidencia exacta
   if (textoNormal.includes(entidadNormal)) return true;
 
-  // Regex relajada: permite mayúsculas, espacios o caracteres invisibles
-  const pattern = entidadNormal.split(' ').join('\\s+'); // Soporta múltiples espacios
-  const regex = new RegExp(`\\b${pattern}\\b`, 'i');
-  return regex.test(textoNormal);
+  // Coincidencia por palabras individuales del nombre
+  const partes = entidadNormal.split(/\s+/); // ej. ['ursula', 'iguaran']
+  return partes.some(parte => textoNormal.includes(parte));
 }
+
 
 function limpiarTexto(str) {
   return str
@@ -132,7 +136,10 @@ async function analizarPregunta(pregunta) {
     const nombreMatch = matchFlexible(nombre, texto);
     const aliasMatch = alias && matchFlexible(alias, texto);
     const matched = nombreMatch || aliasMatch;
-    console.log(`🔍 [MATCH] Personaje: "${p.nombre}" => NombreMatch: ${nombreMatch}, AliasMatch: ${aliasMatch}`);
+    if (nombreMatch || aliasMatch) {
+      const porAlias = aliasMatch ? ' (alias)' : '';
+      console.log(`🟢 [MATCH] Personaje detectado: "${p.nombre}"${porAlias}`);
+    }
     return matched;
   }).map(p => p.nombre);
 
@@ -150,30 +157,47 @@ async function analizarPregunta(pregunta) {
   console.log('📍 [nlpProcessor] Lugares detectados:', lugares);
   console.log('📦 [nlpProcessor] Objetos detectados:', objetos);
 
-  const verbosDetectados = [];
+  // ----------------------
+  // Reemplazar el bloque de detección de verbos por este bloque:
+  const regexVerbos = [];       // aquí almacenaremos RegExp para la consulta en BD
+  const verbosDetectados = [];  // opcional, para logging o contexto
+
+  // normalizar pregunta para detección (sin tildes, minúsculas)
+  const textoNorm = limpiarTexto(pregunta); // o la función que uses para normalizar en minúsculas y quitar diacríticos
+
   for (const [clave, formas] of Object.entries(verbosClave)) {
     for (const forma of formas) {
-      const formaNormal = limpiarTexto(forma);
-      const regex = new RegExp(`\\b${formaNormal}\\b`, 'i');
-      if (regex.test(texto)) {
-        verbosDetectados.push(clave);
-        break;
+      // Normalizamos la forma para detectar en la pregunta
+      const formaNorm = limpiarTexto(forma);
+      const reDetect = new RegExp(`\\b${escapeRegex(formaNorm)}\\b`, 'i');
+      if (reDetect.test(textoNorm)) {
+        // Se detectó esta forma en la pregunta
+        verbosDetectados.push({ clave, formaEncontrada: forma });
+        // Ahora construimos regex para todas las variantes literales de esta clave
+        for (const f of formas) {
+          // Escapamos caracteres especiales, mantenemos tildes literales
+          const escapedLiteral = escapeRegex(f);
+          regexVerbos.push(new RegExp(`\\b${escapedLiteral}\\b`, 'i'));
+        }
+        break; // pasamos al siguiente verboClave
       }
     }
   }
 
   console.log('✏️ [nlpProcessor] Verbos detectados:', verbosDetectados);
 
+  const fuzzy = await buscarEventoSimilar(pregunta);
+
   return {
     capitulo,
-    verbos: verbosDetectados,
-    personajes,
-    lugares,
-    objetos,
-    fuzzy: personajes.length === 0 && lugares.length === 0 && objetos.length === 0 && verbosDetectados.length === 0
-      ? await buscarEventoSimilar(pregunta)
-      : null
+    regexVerbos,               // usado en preguntas.js
+    personajes,                // <-- ESTO sí lo espera preguntas.js
+    lugares,                   // <-- ESTO también
+    objetos,                   // opcional, si lo necesitas luego
+    fuzzy                      // por si preguntas.js lo usa
   };
+
+
 }
 
 module.exports = { analizarPregunta, normalizar };

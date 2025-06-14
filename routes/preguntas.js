@@ -18,7 +18,7 @@ router.get('/', async (req, res) => {
     }
 
     const analisis = await analizarPregunta(q);
-    const { capitulo, verbos, personajes, lugares, fuzzy } = analisis;
+    const { capitulo, regexVerbos, personajes, lugares, fuzzy } = analisis;
     console.log('🔎 [ANALYSIS]', analisis);
 
     try {
@@ -66,7 +66,7 @@ router.get('/', async (req, res) => {
         console.log('🔢 [IDs] personajes:', personajeIds, 'lugares:', lugarIds);
 
         // 4) Si no hay verbo, entidad ni capítulo, devolver sin resultados
-        if (verbos.length === 0 && personajes.length === 0 && lugares.length === 0) {
+        if ((!regexVerbos || regexVerbos.length === 0) && personajes.length === 0 && lugares.length === 0) {
             console.log('🔤 [FILTER] No hay verbo ni entidad detectada -> 0 resultados');
             return res.json({ capitulo: 'todos', resultados: [] });
         }
@@ -79,16 +79,15 @@ router.get('/', async (req, res) => {
             return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         }
 
-        if (verbos.length) {
-            const verbRegex = verbos.map(v => new RegExp(`\\b${escapeRegex(v)}\\b`, 'i'));
+        if (regexVerbos?.length) {
             andConds.push({
                 $or: [
-                    ...verbRegex.map(r => ({ descripcion: r })),
-                    ...verbRegex.map(r => ({ nombre: r }))
+                    ...regexVerbos.map(r => ({ descripcion: r })),
+                    ...regexVerbos.map(r => ({ nombre: r }))
                 ]
             });
         }
-        
+
         if (personajeIds.length) andConds.push({ personajes_involucrados: { $in: personajeIds } });
         if (lugarIds.length) andConds.push({ lugar_relacionado: { $in: lugarIds } });
         filtro = andConds.length ? { $and: andConds } : {};
