@@ -74,8 +74,13 @@ router.get('/', async (req, res) => {
         // 5) Construir filtro para eventos
         let filtro = {};
         const andConds = [];
+
+        function escapeRegex(str) {
+            return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        }
+
         if (verbos.length) {
-            const verbRegex = verbos.map(v => new RegExp(v, 'i'));
+            const verbRegex = verbos.map(v => new RegExp(`\\b${escapeRegex(v)}\\b`, 'i'));
             andConds.push({
                 $or: [
                     ...verbRegex.map(r => ({ descripcion: r })),
@@ -83,6 +88,7 @@ router.get('/', async (req, res) => {
                 ]
             });
         }
+        
         if (personajeIds.length) andConds.push({ personajes_involucrados: { $in: personajeIds } });
         if (lugarIds.length) andConds.push({ lugar_relacionado: { $in: lugarIds } });
         filtro = andConds.length ? { $and: andConds } : {};
