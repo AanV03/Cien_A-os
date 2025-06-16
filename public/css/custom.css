@@ -1,0 +1,33 @@
+/* === ESTILOS PERSONALIZADOS PARA MACONDO API === */
+
+/* Tarjetas bonitas */
+.card {
+    border-radius: 1rem;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    transition: transform 0.2s ease;
+}
+.card:hover {
+    transform: translateY(-4px);
+}
+
+/* Título de tarjeta */
+.card-title {
+    font-weight: 600;
+    color: #1f1f2e;
+}
+
+/* Botones de edición */
+.btn-outline-primary.editar-btn,
+.btn-outline-primary.editar-simple-btn {
+    border-radius: 20px;
+    padding: 0.25rem 0.75rem;
+    font-size: 0.9rem;
+    width: 90%;
+}
+
+/* Badges (personajes, lugares, generaciones) */
+.badge {
+    border-radius: 8px;
+    padding: 0.4em 0.6em;
+    font-size: 0.8rem;
+}

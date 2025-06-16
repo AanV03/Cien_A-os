@@ -1,9 +1,10 @@
+// public/js/main.js
+
 document.addEventListener('DOMContentLoaded', () => {
     const input = document.getElementById('queryInput');
     const btn = document.getElementById('searchBtn');
     const out = document.getElementById('searchResults');
 
-    // Detecta pregunta, capítulo o búsqueda simple
     function esPregunta(q) {
         const qNorm = q.toLowerCase();
         return (
@@ -13,7 +14,6 @@ document.addEventListener('DOMContentLoaded', () => {
         );
     }
 
-    // Carga opciones en los selects del modal
     async function cargarOpcionesSelect() {
         try {
             const [pers, lug, gen] = await Promise.all([
@@ -36,7 +36,6 @@ document.addEventListener('DOMContentLoaded', () => {
             ).join('');
         } catch (err) {
             console.error('Error cargando opciones para edición:', err);
-            // Opcional: mostrar alerta o mensaje en modal si falla
         }
     }
 
@@ -52,8 +51,18 @@ document.addEventListener('DOMContentLoaded', () => {
             ? `/api/preguntas?q=${encodeURIComponent(q)}`
             : `/api/buscar?q=${encodeURIComponent(q)}`;
 
+        console.log('Buscar:', q, 'endpoint=', endpoint);
+
+        // Timeout visual de 5s
+        const timeoutId = setTimeout(() => {
+            if (out.innerHTML.includes('Cargando resultados')) {
+                out.innerHTML = '<p class="text-warning">La búsqueda está tardando mucho…</p>';
+            }
+        }, 5000);
+
         try {
             const res = await fetch(endpoint);
+            clearTimeout(timeoutId);
             if (!res.ok) {
                 const err = await res.json();
                 throw new Error(err.error);
@@ -61,33 +70,136 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = await res.json();
 
             if (!esPregunta(q)) {
-                // Búsqueda simple: recorre cada colección
+                // Búsqueda simple
                 const keys = Object.keys(data);
                 const total = keys.reduce((sum, k) => sum + data[k].length, 0);
                 if (!total) {
                     out.innerHTML = `<p class="text-info">No se encontraron coincidencias para “${q}”.</p>`;
                     return;
                 }
+
                 let html = `<h4 class="text-primary">Resultados para “${q}”:</h4>`;
+
                 keys.forEach(key => {
-                    if (data[key].length) {
-                        html += `<h5 class="mt-3 text-secondary">${key.charAt(0).toUpperCase() + key.slice(1)}:</h5>`;
-                        data[key].forEach(item => {
-                            const title = item.nombre || item.titulo || '—';
-                            const desc = item.descripcion || '';
-                            html += `
-                                <div class="card mb-2">
-                                    <div class="card-body">
-                                        <h5 class="card-title">${title}</h5>
-                                        <p class="card-text">${desc}</p>
-                                    </div>
-                                </div>`;
-                        });
-                    }
+                    if (!data[key].length) return;
+                    html += `<h5 class="mt-3 text-secondary">${key.charAt(0).toUpperCase() + key.slice(1)}:</h5>`;
+                    data[key].forEach(item => {
+                        let extra = '';
+                        let editDataAttrs = '';
+
+                        if (key === 'personajes') {
+                            extra = `
+                                <p><strong>Destino:</strong> ${item.destino || ''}</p>
+                                <p><strong>Género:</strong> ${item.genero || ''}</p>
+                                <p><strong>Generación:</strong> ${item.generacion || ''}</p>
+                                ${item.objetos?.length
+                                    ? `<p><strong>Objetos:</strong> ${item.objetos.map(o => o.nombre).join(', ')}</p>`
+                                    : ''}
+                            `;
+                            editDataAttrs = `
+                                data-tipo="personaje"
+                                data-id="${item._id}"
+                                data-nombre="${item.nombre || ''}"
+                                data-destino="${item.destino || ''}"
+                                data-genero="${item.genero || ''}"
+                                data-generacion="${item.generacion || ''}"
+                            `;
+                        } else if (key === 'lugares') {
+                            extra = `
+                                <p><strong>Descripción:</strong> ${item.descripcion || ''}</p>
+                                ${item.eventos_relacionados?.length
+                                    ? `<p><strong>Eventos relacionados:</strong> ${item.eventos_relacionados.map(ev => ev.nombre).join(', ')}</p>`
+                                    : ''}
+                                ${item.generaciones_relacionadas?.length
+                                    ? `<p><strong>Generaciones relacionadas:</strong> ${item.generaciones_relacionadas.map(g => g.nombre).join(', ')}</p>`
+                                    : ''}
+                            `;
+                            editDataAttrs = `
+                                data-tipo="lugar"
+                                data-id="${item._id}"
+                                data-nombre="${item.nombre || ''}"
+                                data-descripcion="${item.descripcion || ''}"
+                            `;
+                        } else if (key === 'generaciones') {
+                            extra = `
+                                <p><strong>Descripción:</strong> ${item.descripcion || ''}</p>
+                                ${item.personajes_principales?.length
+                                    ? `<p><strong>Personajes principales:</strong> ${item.personajes_principales.map(p => p.nombre).join(', ')}</p>`
+                                    : ''}
+                            `;
+                            editDataAttrs = `
+                                data-tipo="generacion"
+                                data-id="${item._id}"
+                                data-nombre="${item.nombre || ''}"
+                                data-descripcion="${item.descripcion || ''}"
+                            `;
+                        } else if (key === 'eventos') {
+                            const personajesBadges = (item.personajes_involucrados || [])
+                                .map(p => `<span class="badge badge-secondary mr-1">${p.nombre}</span>`).join('');
+                            extra = `
+                                <p><strong>Descripción:</strong> ${item.descripcion || ''}</p>
+                                ${personajesBadges ? `<p><strong>Personajes:</strong> ${personajesBadges}</p>` : ''}
+                                ${item.lugar_relacionado?.nombre ? `<p><strong>Lugar:</strong> ${item.lugar_relacionado.nombre}</p>` : ''}
+                                ${item.generacion_relacionada?.nombre ? `<p><strong>Generación:</strong> ${item.generacion_relacionada.nombre}</p>` : ''}
+                            `;
+                            // pasamos referencias en data-attrs para preselección
+                            editDataAttrs = `
+                                data-tipo="evento"
+                                data-id="${item._id}"
+                                data-nombre="${item.nombre || ''}"
+                                data-descripcion="${item.descripcion || ''}"
+                                data-personajes='${JSON.stringify(item.personajes_involucrados?.map(p => p._id) || [])}'
+                                data-lugar='${item.lugar_relacionado?._id || ''}'
+                                data-generacion='${item.generacion_relacionada?._id || ''}'
+                            `;
+                        } else if (key === 'objetos') {
+                            extra = `
+                                <p><strong>Descripción:</strong> ${item.descripcion || ''}</p>
+                                ${item.evento_relacionado?.nombre ? `<p><strong>Evento:</strong> ${item.evento_relacionado.nombre}</p>` : ''}
+                                ${item.lugar_relacionado?.nombre ? `<p><strong>Lugar:</strong> ${item.lugar_relacionado.nombre}</p>` : ''}
+                                ${item.personaje_relacionado?.nombre ? `<p><strong>Personaje:</strong> ${item.personaje_relacionado.nombre}</p>` : ''}
+                                ${item.generacion_relacionada?.nombre ? `<p><strong>Generación:</strong> ${item.generacion_relacionada.nombre}</p>` : ''}
+                            `;
+                            editDataAttrs = `
+                                data-tipo="objeto"
+                                data-id="${item._id}"
+                                data-nombre="${item.nombre || ''}"
+                                data-descripcion="${item.descripcion || ''}"
+                                data-evento='${item.evento_relacionado?._id || ''}'
+                                data-lugar='${item.lugar_relacionado?._id || ''}'
+                                data-personaje='${item.personaje_relacionado?._id || ''}'
+                                data-generacion='${item.generacion_relacionada?._id || ''}'
+                            `;
+                        } else {
+                            // fallback
+                            extra = `<p><strong>Descripción:</strong> ${item.descripcion || ''}</p>`;
+                            editDataAttrs = `
+                                data-tipo="${key}"
+                                data-id="${item._id}"
+                                data-nombre="${item.nombre || ''}"
+                                data-descripcion="${item.descripcion || ''}"
+                            `;
+                        }
+
+                        html += `
+                            <div class="card mb-2">
+                                <div class="card-body">
+                                    <h5 class="card-title">${item.nombre || ''}</h5>
+                                    ${extra}
+                                    <button class="btn btn-sm btn-outline-primary editar-simple-btn" ${editDataAttrs}>Editar</button>
+                                </div>
+                            </div>
+                        `;
+                    });
                 });
+
+                // Inserción de HTML y luego asignar listeners
                 out.innerHTML = html;
+                document.querySelectorAll('.editar-simple-btn').forEach(btn => {
+                    btn.addEventListener('click', () => abrirModalEdicionSimple(btn.dataset));
+                });
             } else {
-                // Pregunta o capítulo
+                // Pregunta o capítulo: resultados de eventos
                 const { capitulo, resultados } = data;
                 if (!resultados.length) {
                     out.innerHTML = capitulo === 'todos'
@@ -99,11 +211,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     ? `<h4 class="text-primary">Resultados para “${q}”:</h4>`
                     : `<h4 class="text-primary">Eventos en capítulo ${capitulo}:</h4>`;
 
-                // Construye las tarjetas con botón Editar
-                const items = resultados.map(ev => {
+                const itemsHtml = resultados.map(ev => {
                     const personajes = (ev.personajes_involucrados || [])
-                        .map(p => `<span class="badge badge-secondary mr-1">${p.nombre}</span>`)
-                        .join('');
+                        .map(p => `<span class="badge badge-secondary mr-1">${p.nombre}</span>`).join('');
                     const lugar = ev.lugar_relacionado?.nombre
                         ? `<p><strong>Lugar:</strong> <span class="badge badge-secondary">${ev.lugar_relacionado.nombre}</span></p>`
                         : '';
@@ -120,74 +230,298 @@ document.addEventListener('DOMContentLoaded', () => {
                                 ${generacion}
                                 <button class="btn btn-sm btn-outline-primary editar-btn" data-id="${ev._id}">Editar</button>
                             </div>
-                        </div>`;
+                        </div>
+                    `;
                 }).join('');
-
-                out.innerHTML = header + items;
-
-                // Ahora que ya se insertó el HTML, asigna listeners a cada botón Editar
+                out.innerHTML = header + itemsHtml;
                 document.querySelectorAll('.editar-btn').forEach(btnEd => {
-                    btnEd.addEventListener('click', async e => {
+                    btnEd.addEventListener('click', async () => {
                         const id = btnEd.getAttribute('data-id');
-                        // Encuentra la card-body correspondiente
                         const cardBody = btnEd.closest('.card-body');
-                        // Rellena el formulario del modal con datos actuales
                         document.getElementById('editEventId').value = id;
                         document.getElementById('editNombre').value =
                             cardBody.querySelector('.card-title').textContent.trim();
                         document.getElementById('editDescripcion').value =
                             cardBody.querySelector('.card-text').textContent.trim();
-
-                        // Cargar opciones de selects y, si deseas, preseleccionar el valor actual:
                         await cargarOpcionesSelect();
-                        // Para preseleccionar: 
-                        // Si 'ev.personajes_involucrados' es un array de objetos con _id,
-                        // podrías hacer selectPersonaje.value = ev.personajes_involucrados[0]._id
-                        // Pero aquí, como no tenemos 'ev' en este scope, una opción es:
-                        // - Al renderizar, incluye data-attributes con el id actual.
-                        // O tras fetch adicional GET /api/eventos/:id para obtener el objeto completo.
-                        // Aquí asumiremos que solo elegimos de cero (el usuario re-selecciona).
-
-                        // Mostrar modal
                         $('#editModal').modal('show');
                     });
                 });
             }
         } catch (e) {
-            console.error(e);
+            clearTimeout(timeoutId);
+            console.error('Error en buscar():', e);
             out.innerHTML = `<p class="text-danger">Error: ${e.message}</p>`;
         }
     }
 
-    // Listener del formulario de edición del modal
-    document.getElementById('editForm').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const id = document.getElementById('editEventId').value;
-        const body = {
-            nombre: document.getElementById('editNombre').value,
-            descripcion: document.getElementById('editDescripcion').value,
-            personajes_involucrados: [document.getElementById('editPersonaje').value],
-            lugar_relacionado: document.getElementById('editLugar').value,
-            generacion_relacionada: document.getElementById('editGeneracion').value
-        };
-        try {
-            const res = await fetch(`/api/eventos/${id}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(body)
-            });
-            if (!res.ok) throw new Error('Error al actualizar el evento');
-            $('#editModal').modal('hide');
-            // Opcional: mostrar mensaje breve en pantalla en vez de alert
-            alert('Evento actualizado con éxito.');
-            buscar(); // reejecuta búsqueda para refrescar resultados sin recargar toda la página
-        } catch (err) {
-            console.error(err);
-            alert(err.message);
-        }
-    });
+    // Formulario edición de eventos (modal fijo en tu HTML)
+    const editForm = document.getElementById('editForm');
+    if (editForm) {
+        editForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const id = document.getElementById('editEventId').value;
+            const body = {
+                nombre: document.getElementById('editNombre').value,
+                descripcion: document.getElementById('editDescripcion').value,
+                personajes_involucrados: [document.getElementById('editPersonaje').value],
+                lugar_relacionado: document.getElementById('editLugar').value,
+                generacion_relacionada: document.getElementById('editGeneracion').value
+            };
+            try {
+                const res = await fetch(`/api/eventos/${id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+                if (!res.ok) {
+                    const err = await res.json();
+                    throw new Error(err.error || 'Error al actualizar el evento');
+                }
+                $('#editModal').modal('hide');
+                alert('Evento actualizado con éxito.');
+                buscar();
+            } catch (err) {
+                console.error(err);
+                alert(err.message);
+            }
+        });
+    }
 
-    // Finalmente, listener para búsqueda
+    // Abre modal de edición simple para cada tipo
+    function abrirModalEdicionSimple(dataset) {
+        const { tipo, id, nombre, descripcion } = dataset;
+        document.getElementById('simpleEditTipo').value = tipo;
+        document.getElementById('simpleEditId').value = id;
+
+        let html = `
+            <div class="form-group">
+                <label>Nombre</label>
+                <input type="text" class="form-control" id="editNombreSimple" value="${nombre || ''}">
+            </div>
+        `;
+
+        if (tipo === 'personaje') {
+            const destino = dataset.destino || '';
+            const genero = dataset.genero || '';
+            const generacion = dataset.generacion || '';
+            html += `
+                <div class="form-group">
+                    <label>Destino</label>
+                    <input type="text" class="form-control" id="editDestinoSimple" value="${destino}">
+                </div>
+                <div class="form-group">
+                    <label>Género</label>
+                    <select class="form-control" id="editGeneroSimple">
+                        <option value="masculino" ${genero === 'masculino' ? 'selected' : ''}>Masculino</option>
+                        <option value="femenino" ${genero === 'femenino' ? 'selected' : ''}>Femenino</option>
+                        <option value="otro" ${genero === 'otro' ? 'selected' : ''}>Otro</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Generación</label>
+                    <input type="number" class="form-control" id="editGeneracionNumSimple" value="${generacion}">
+                </div>
+            `;
+            document.getElementById('simpleEditBody').innerHTML = html;
+            $('#simpleEditModal').modal('show');
+        } else if (tipo === 'lugar' || tipo === 'generacion') {
+            html += `
+                <div class="form-group">
+                    <label>Descripción</label>
+                    <textarea class="form-control" id="editDescripcionSimple">${descripcion || ''}</textarea>
+                </div>
+            `;
+            document.getElementById('simpleEditBody').innerHTML = html;
+            $('#simpleEditModal').modal('show');
+        } else if (tipo === 'evento') {
+            // data-personajes es JSON-string
+            let personajesAct = [];
+            try { personajesAct = JSON.parse(dataset.personajes || '[]'); } catch { }
+            const lugarAct = dataset.lugar || '';
+            const genAct = dataset.generacion || '';
+            html += `
+                <div class="form-group">
+                    <label>Descripción</label>
+                    <textarea class="form-control" id="editDescripcionSimple">${descripcion || ''}</textarea>
+                </div>
+                <div class="form-group">
+                    <label>Personajes involucrados</label>
+                    <select multiple class="form-control" id="editPersonajesSimple"></select>
+                </div>
+                <div class="form-group">
+                    <label>Lugar relacionado</label>
+                    <select class="form-control" id="editLugarSimple"></select>
+                </div>
+                <div class="form-group">
+                    <label>Generación relacionada</label>
+                    <select class="form-control" id="editGeneracionSimple"></select>
+                </div>
+            `;
+            document.getElementById('simpleEditBody').innerHTML = html;
+            cargarOpcionesSelectSimple('evento', {
+                personajes: personajesAct,
+                lugar: lugarAct,
+                generacion: genAct
+            });
+            $('#simpleEditModal').modal('show');
+        } else if (tipo === 'objeto') {
+            const eventoAct = dataset.evento || '';
+            const lugarAct = dataset.lugar || '';
+            const personajeAct = dataset.personaje || '';
+            const genAct = dataset.generacion || '';
+            html += `
+                <div class="form-group">
+                    <label>Descripción</label>
+                    <textarea class="form-control" id="editDescripcionSimple">${descripcion || ''}</textarea>
+                </div>
+                <div class="form-group">
+                    <label>Evento relacionado</label>
+                    <select class="form-control" id="editEventoSimple"></select>
+                </div>
+                <div class="form-group">
+                    <label>Lugar relacionado</label>
+                    <select class="form-control" id="editLugarSimple"></select>
+                </div>
+                <div class="form-group">
+                    <label>Personaje relacionado</label>
+                    <select class="form-control" id="editPersonajeSimple"></select>
+                </div>
+                <div class="form-group">
+                    <label>Generación relacionada</label>
+                    <select class="form-control" id="editGeneracionSimple"></select>
+                </div>
+            `;
+            document.getElementById('simpleEditBody').innerHTML = html;
+            cargarOpcionesSelectSimple('objeto', {
+                evento: eventoAct,
+                lugar: lugarAct,
+                personaje: personajeAct,
+                generacion: genAct
+            });
+            $('#simpleEditModal').modal('show');
+        } else {
+            // fallback: únicamente nombre y descripción
+            html += `
+                <div class="form-group">
+                    <label>Descripción</label>
+                    <textarea class="form-control" id="editDescripcionSimple">${descripcion || ''}</textarea>
+                </div>
+            `;
+            document.getElementById('simpleEditBody').innerHTML = html;
+            $('#simpleEditModal').modal('show');
+        }
+    }
+
+    // Carga y preselección de selects para edición simple de evento u objeto
+    async function cargarOpcionesSelectSimple(tipo, datosActuales) {
+        try {
+            const [persList, lugList, genList, eventosList] = await Promise.all([
+                fetch('/api/personajes').then(r => r.json()),
+                fetch('/api/lugares').then(r => r.json()),
+                fetch('/api/generaciones').then(r => r.json()),
+                fetch('/api/eventos').then(r => r.json()),
+            ]);
+
+            if (tipo === 'evento') {
+                const selectP = document.getElementById('editPersonajesSimple');
+                selectP.innerHTML = persList.map(p =>
+                    `<option value="${p._id}" ${datosActuales.personajes.includes(p._id) ? 'selected' : ''}>${p.nombre}</option>`
+                ).join('');
+                const selectL = document.getElementById('editLugarSimple');
+                selectL.innerHTML = lugList.map(l =>
+                    `<option value="${l._id}" ${datosActuales.lugar === l._id ? 'selected' : ''}>${l.nombre}</option>`
+                ).join('');
+                const selectG = document.getElementById('editGeneracionSimple');
+                selectG.innerHTML = genList.map(g =>
+                    `<option value="${g._id}" ${datosActuales.generacion === g._id ? 'selected' : ''}>${g.nombre}</option>`
+                ).join('');
+            } else if (tipo === 'objeto') {
+                const selectEv = document.getElementById('editEventoSimple');
+                selectEv.innerHTML = eventosList.map(ev =>
+                    `<option value="${ev._id}" ${datosActuales.evento === ev._id ? 'selected' : ''}>${ev.nombre}</option>`
+                ).join('');
+                const selectL = document.getElementById('editLugarSimple');
+                selectL.innerHTML = lugList.map(l =>
+                    `<option value="${l._id}" ${datosActuales.lugar === l._id ? 'selected' : ''}>${l.nombre}</option>`
+                ).join('');
+                const selectP = document.getElementById('editPersonajeSimple');
+                selectP.innerHTML = persList.map(p =>
+                    `<option value="${p._id}" ${datosActuales.personaje === p._id ? 'selected' : ''}>${p.nombre}</option>`
+                ).join('');
+                const selectG = document.getElementById('editGeneracionSimple');
+                selectG.innerHTML = genList.map(g =>
+                    `<option value="${g._id}" ${datosActuales.generacion === g._id ? 'selected' : ''}>${g.nombre}</option>`
+                ).join('');
+            }
+        } catch (err) {
+            console.error('Error en cargarOpcionesSelectSimple:', err);
+        }
+    }
+
+    // Listener del formulario de edición simple (modal)
+    const simpleEditForm = document.getElementById('simpleEditForm');
+    if (simpleEditForm) {
+        simpleEditForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const tipo = document.getElementById('simpleEditTipo').value;
+            const id = document.getElementById('simpleEditId').value;
+            let body = { nombre: document.getElementById('editNombreSimple').value };
+
+            if (tipo === 'personaje') {
+                body.destino = document.getElementById('editDestinoSimple').value;
+                body.genero = document.getElementById('editGeneroSimple').value;
+                body.generacion = parseInt(document.getElementById('editGeneracionNumSimple').value);
+            } else if (tipo === 'lugar' || tipo === 'generacion') {
+                body.descripcion = document.getElementById('editDescripcionSimple').value;
+            } else if (tipo === 'evento') {
+                body.descripcion = document.getElementById('editDescripcionSimple').value;
+                const selPersOpts = Array.from(document.getElementById('editPersonajesSimple').selectedOptions);
+                body.personajes_involucrados = selPersOpts.map(o => o.value);
+                body.lugar_relacionado = document.getElementById('editLugarSimple').value;
+                body.generacion_relacionada = document.getElementById('editGeneracionSimple').value;
+            } else if (tipo === 'objeto') {
+                body.descripcion = document.getElementById('editDescripcionSimple').value;
+                body.evento_relacionado = document.getElementById('editEventoSimple').value;
+                body.lugar_relacionado = document.getElementById('editLugarSimple').value;
+                body.personaje_relacionado = document.getElementById('editPersonajeSimple').value;
+                body.generacion_relacionada = document.getElementById('editGeneracionSimple').value;
+            }
+            try {
+                // Corrige pluralización manualmente para evitar errores como "generacions"
+                const endpointMap = {
+                    personaje: 'personajes',
+                    lugar: 'lugares',
+                    generacion: 'generaciones',
+                    evento: 'eventos',
+                    objeto: 'objetos'
+                };
+
+                const endpoint = endpointMap[tipo];
+                if (!endpoint) throw new Error('Tipo de entidad desconocido');
+
+                const res = await fetch(`/api/${endpoint}/${id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+
+                if (!res.ok) {
+                    const err = await res.json();
+                    throw new Error(err.error || 'Error al actualizar');
+                }
+
+                $('#simpleEditModal').modal('hide');
+                alert(`${tipo.charAt(0).toUpperCase() + tipo.slice(1)} actualizado correctamente.`);
+                buscar(); // refresca resultados
+            } catch (err) {
+                console.error(err);
+                alert('Error al guardar cambios: ' + (err.message || ''));
+            }
+        });
+    }
+
+    // Listeners para disparar búsqueda
     btn.addEventListener('click', buscar);
     input.addEventListener('keydown', e => { if (e.key === 'Enter') buscar(); });
 });

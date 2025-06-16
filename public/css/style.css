@@ -272,7 +272,7 @@ button,
 [type="button"],
 [type="reset"],
 [type="submit"] {
-    -webkit-appearance: button;
+-webkit-appearance: button;
 }
 
 button:not(:disabled),
@@ -10857,4 +10857,25 @@ p,
     margin: 0;
     padding: 0;
     list-style-type: none;
+}
+
+
+#queryInput {
+    border-radius: 8px 0 0 8px !important;
+}
+
+#searchBtn {
+    border-radius: 0 8px 8px 0 !important;
+}
+
+form,
+input,
+button,
+.card,
+.container,
+img,
+fieldset,
+.navbar,
+.modal-content {
+    border-radius: 8px !important;
 }
