@@ -11,7 +11,40 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" />
     <link href="./css/style.css" rel="stylesheet">
     <link href="./css/custom.css" rel="stylesheet">
+    <!-- Bootstrap CSS (si no lo tienes en style.css) -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css"
+        integrity="sha384-Fy6S3B9q64WdZWQUiU+q4/2LcGOGU5Y5PkFOmYlFhbGU+6BZp6G7niu735Sk7lN" crossorigin="anonymous">
+    <style>
+        /* Opcional: asegúrate de que nuestro modal dinámico esté encima */
+        .custom-modal-backdrop {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1050;
+            /* por encima de otros elementos */
+        }
 
+        .custom-modal-content {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            width: 400px;
+            max-width: 90%;
+            max-height: 90%;
+            overflow-y: auto;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+        }
+
+        .custom-modal-content h2 {
+            margin-top: 0;
+        }
+    </style>
 </head>
 
 <body>
@@ -25,24 +58,46 @@
     </div>
     <!-- Topbar End -->
 
-
     <!-- Navbar Start -->
     <div class="container-fluid p-0">
         <nav class="navbar navbar-expand-lg bg-light navbar-light py-3 py-lg-0 px-lg-5">
-                <h1 class="m-0 display-5 text-uppercase text-primary"><i class="fa fa-truck mr-2"></i>MacondoAPI</h1>
-            </a>
-            <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarCollapse">
-                <span class="bi bi-book"></span>
+            <h1 class="m-0 display-5 text-uppercase text-primary"><i class="fa fa-truck mr-2"></i>MacondoAPI</h1>
+
+            <!-- Botón hamburguesa -->
+            <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarCollapse"
+                aria-controls="navbarCollapse" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
             </button>
 
-            <div class="collapse navbar-collapse justify-content-between px-lg-3">
-                <div class="navbar-nav m-auto py-0">
-                    <a href="price.html" class="nav-item nav-link">Hola que hace</a>
-                </div>
+            <!-- Contenido colapsable -->
+            <div class="collapse navbar-collapse justify-content-end px-lg-3" id="navbarCollapse">
+                <ul class="navbar-nav ml-auto">
+                    <li class="nav-item mx-1">
+                        <button class="btn btn-outline-primary btn-block"
+                            onclick="createModal('Objeto', '/api/objetos')">Crear Objeto</button>
+                    </li>
+                    <li class="nav-item mx-1">
+                        <button class="btn btn-outline-primary btn-block"
+                            onclick="createModal('Personaje', '/api/personajes')">Crear Personaje</button>
+                    </li>
+                    <li class="nav-item mx-1">
+                        <button class="btn btn-outline-primary btn-block"
+                            onclick="createModal('Lugar', '/api/lugares')">Crear Lugar</button>
+                    </li>
+                    <li class="nav-item mx-1">
+                        <button class="btn btn-outline-primary btn-block"
+                            onclick="createModal('Evento', '/api/eventos')">Crear Evento</button>
+                    </li>
+                    <li class="nav-item mx-1">
+                        <button class="btn btn-outline-primary btn-block"
+                            onclick="createModal('Generacion', '/api/generaciones')">Crear Generación</button>
+                    </li>
+                </ul>
             </div>
         </nav>
     </div>
     <!-- Navbar End -->
+
 
     <!-- Header Start -->
     <div class="jumbotron jumbotron-fluid mb-5">
@@ -58,22 +113,17 @@
                     </div>
                 </div>
             </div>
-            <!-- Contenedor de resultados -->
-            <div id="searchResults" class="mt-4 text-left" style="max-width:600px; margin: 0 auto;"></div>
         </div>
     </div>
     <!-- Header End -->
 
+
+    <!-- resultados -->
+    <div id="searchResults" class="mt-4 text-left" style="max-width:600px; margin: 0 auto;"></div>
+
+
     <!-- Footer Start -->
-    <div class="container-fluid bg-dark text-white mt-5 py-5 px-sm-3 px-md-5">
-        <div class="row pt-5">
-            <div class="col-lg-7 col-md-6">
-                <div class="row">
-                    <div class="col-md-6 mb-5"></div>
-                </div>
-                <div class="col-md-6 mb-5"></div>
-            </div>
-        </div>
+    <div class="container-fluid bg-dark text-white mt-5 py-3 px-sm-3 px-md-5">
     </div>
     <div class="container-fluid bg-dark text-white border-top py-4 px-sm-3 px-md-5"
         style="border-color: #3E3E4E !important;">
@@ -84,13 +134,7 @@
     <!-- Back to Top -->
     <a href="#" class="btn btn-lg btn-primary back-to-top"><i class="fa fa-angle-double-up"></i></a>
 
-    <!-- Contact Javascript File 
-    <script src="mail/jqBootstrapValidation.min.js"></script>
-    <script src="mail/contact.js"></script> -->
-
-
-    <!--Modal para modificacion de busquedas avanzadas (preguntas)-->
-
+    <!-- Modal para modificación de busquedas avanzadas (preguntas) -->
     <div class="modal fade" id="editModal" tabindex="-1" role="dialog" aria-labelledby="editModalLabel"
         aria-hidden="true">
         <div class="modal-dialog" role="document">
@@ -155,16 +199,14 @@
         </div>
     </div>
 
-
-    <!-- Back to Top -->
-    <a href="#" class="btn btn-lg btn-primary back-to-top"><i class="fa fa-angle-double-up"></i></a>
-
     <!-- jQuery y Bootstrap JS para usar $('#editModal').modal('show') -->
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.bundle.min.js"></script>
 
-    <!-- logica detras del front-->
+    <!-- tu lógica existente -->
     <script src="./js/main.js"></script>
+    <!-- createmodal.js: contenido abajo -->
+    <script src="./js/createmodal.js"></script>
 
 </body>
 
