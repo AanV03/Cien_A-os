@@ -96,7 +96,7 @@ router.get('/', async (req, res) => {
         );
 
         return res.json({ personajes, lugares, objetos, generaciones, eventos });
-
+        
     } catch (error) {
         console.error('[ERROR] en /api/buscar:', error);
         return res.status(500).json({ error: 'Error interno del servidor' });

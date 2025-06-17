@@ -1,19 +1,70 @@
-// public/js/main.js
-
+/**
+ * @fileoverview Manejador principal del frontend: búsqueda semántica y edición de entidades
+ * (personajes, lugares, objetos, generaciones, eventos).
+ * Se ejecuta cuando el DOM se carga.
+ */
 document.addEventListener('DOMContentLoaded', () => {
+    /**
+     * @type {HTMLInputElement}
+     * Elemento de entrada de texto para la consulta.
+     */
     const input = document.getElementById('queryInput');
+    /**
+     * @type {HTMLButtonElement}
+     * Botón para disparar la búsqueda.
+     */
     const btn = document.getElementById('searchBtn');
+    /**
+     * @type {HTMLElement}
+     * Contenedor donde se mostrarán los resultados de búsqueda.
+     */
     const out = document.getElementById('searchResults');
 
+    /**
+     * Determina si una cadena debe tratarse como pregunta semántica.
+     * Considera:
+     *  1) Si termina con signo de interrogación (¿ o ?).
+     *  2) Si comienza con palabra interrogativa (quién, qué, cuándo, etc.).
+     *  3) Si menciona “capítulo <número>”.
+     *
+     * @param {string} q - Texto de la consulta.
+     * @returns {boolean} True si se detecta como pregunta semántica.
+     */
     function esPregunta(q) {
-        const qNorm = q.toLowerCase();
-        return (
-            /[¿?]/.test(q) ||
-            /\b(qu[eé]|cu[aá]ndo|d[oó]nde|por qu[eé]|c[oó]mo|qui[eé]n|para qu[eé]|cu[aá]les?)\b/i.test(qNorm) ||
-            /cap[ií]tulo\s*\d+/i.test(qNorm)
-        );
+        const qTrim = q.trim();
+        if (!qTrim) return false;
+        const qNorm = qTrim.toLowerCase();
+
+        // 1) Si termina en signo de interrogación (¿ o ?)
+        if (/[?¿]\s*$/.test(qTrim)) {
+            console.log('esPregunta: detectado por signo ?', qTrim);
+            return true;
+        }
+        // 2) Si comienza con palabra interrogativa al inicio
+        if (/^(qu[eé]|cu[aá]ndo|d[oó]nde|por qu[eé]|c[oó]mo|qui[eé]n|para qu[eé]|cu[aá]les?)\b/i.test(qNorm)) {
+            console.log('esPregunta: detectado por palabra interrogativa al inicio:', qNorm);
+            return true;
+        }
+        // 3) Si menciona “capítulo <número>” (puede estar en medio o al inicio)
+        const capMatch = qNorm.match(/cap[ií]tulo\s*(\d+)/i);
+        if (capMatch) {
+            console.log('esPregunta: detectado por “capítulo N”:', capMatch[0]);
+            return true;
+        }
+        // No se considera pregunta semántica
+        console.log('esPregunta: no es pregunta semántica:', qTrim);
+        return false;
     }
 
+    /**
+     * Carga opciones en los selects del modal de edición:
+     * - Personajes
+     * - Lugares
+     * - Generaciones
+     * Popula los elementos <select> con id 'editPersonaje', 'editLugar', 'editGeneracion'.
+     *
+     * @returns {Promise<void>} Promise que resuelve cuando se han cargado y asignado las opciones.
+     */
     async function cargarOpcionesSelect() {
         try {
             const [pers, lug, gen] = await Promise.all([
@@ -39,6 +90,14 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    /**
+     * Realiza la búsqueda al pulsar botón o Enter.
+     * Decide endpoint según si es pregunta semántica o búsqueda simple.
+     * Muestra mensaje de "Cargando..." y maneja timeout visual si tarda >5s.
+     * Luego procesa la respuesta JSON para renderizar resultados en 'out'.
+     *
+     * @returns {Promise<void>}
+     */
     async function buscar() {
         const q = input.value.trim();
         if (!q) {
@@ -255,7 +314,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // Formulario edición de eventos (modal fijo en tu HTML)
+    /**
+     * Listener del formulario de edición de eventos (modal fijo en tu HTML).
+     * Se asocia si existe el elemento con id 'editForm'.
+     */
     const editForm = document.getElementById('editForm');
     if (editForm) {
         editForm.addEventListener('submit', async (e) => {
@@ -288,7 +350,10 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Abre modal de edición simple para cada tipo
+    /**
+     * Abre modal de edición simple para cada tipo de entidad.
+     * @param {DOMStringMap} dataset - Atributos data-* del elemento disparador.
+     */
     function abrirModalEdicionSimple(dataset) {
         const { tipo, id, nombre, descripcion } = dataset;
         document.getElementById('simpleEditTipo').value = tipo;
@@ -335,7 +400,6 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('simpleEditBody').innerHTML = html;
             $('#simpleEditModal').modal('show');
         } else if (tipo === 'evento') {
-            // data-personajes es JSON-string
             let personajesAct = [];
             try { personajesAct = JSON.parse(dataset.personajes || '[]'); } catch { }
             const lugarAct = dataset.lugar || '';
@@ -413,7 +477,19 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // Carga y preselección de selects para edición simple de evento u objeto
+    /**
+     * Carga opciones en selects del modal de edición simple para 'evento' u 'objeto'.
+     * - Si tipo='evento', llena selects de personajes, lugares y generaciones,
+     *   preseleccionando según datosActuales.personajes, lugar, generacion.
+     * - Si tipo='objeto', llena selects de eventos, lugares, personajes y generaciones,
+     *   preseleccionando según datosActuales.evento, lugar, personaje, generacion.
+     *
+     * @param {'evento'|'objeto'} tipo - Tipo de entidad a editar.
+     * @param {Object} datosActuales - Valores actuales para preselección.
+     *   - Para 'evento': { personajes: string[], lugar: string, generacion: string }
+     *   - Para 'objeto': { evento: string, lugar: string, personaje: string, generacion: string }
+     * @returns {Promise<void>}
+     */
     async function cargarOpcionesSelectSimple(tipo, datosActuales) {
         try {
             const [persList, lugList, genList, eventosList] = await Promise.all([
@@ -459,7 +535,14 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // Listener del formulario de edición simple (modal)
+    /**
+     * Listener del formulario de edición simple (modal).
+     * Actualiza la entidad correspondiente según 'tipo' (personaje, lugar, generación, evento, objeto).
+     * Construye body JSON según campos del modal, corrige pluralización de endpoint,
+     * y envía PUT a `/api/{endpoint}/{id}`.
+     *
+     * @returns {void}
+     */
     const simpleEditForm = document.getElementById('simpleEditForm');
     if (simpleEditForm) {
         simpleEditForm.addEventListener('submit', async (e) => {
@@ -521,7 +604,11 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Listeners para disparar búsqueda
+    /**
+     * Asigna listeners para disparar la búsqueda:
+     * - Click en botón 'searchBtn'
+     * - Tecla Enter en input de búsqueda
+     */
     btn.addEventListener('click', buscar);
     input.addEventListener('keydown', e => { if (e.key === 'Enter') buscar(); });
 });
